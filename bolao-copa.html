@@ -725,7 +725,7 @@ async function fetchRealMatches(bustCache = false) {
     : { 'X-Auth-Token': FOOTBALL_API_KEY };
 
   try {
-    const resp = await fetch(fetchUrl, { headers: fetchHeaders });
+    const resp = await fetch(fetchUrl, { headers: fetchHeaders, cache: 'no-store' });
 
     if (!resp.ok) throw new Error('HTTP ' + resp.status);
 
@@ -823,11 +823,18 @@ waitForFB(() => {
 });
 
 // Buscar jogos independentemente do Firebase
-fetchRealMatches().then(matches => {
+fetchRealMatches().then(async matches => {
   allMatches = matches;
   populateGroupFilter();
   renderMatches();
   renderNextMatch();
+  // Se há jogo ao vivo, busca dado fresco imediatamente (ignora cache)
+  if (matches.some(m => m.status === 'LIVE')) {
+    const fresh = await fetchRealMatches(true);
+    allMatches = fresh;
+    renderMatches();
+    renderNextMatch();
+  }
   startLivePolling();
 });
 
