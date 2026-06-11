@@ -756,6 +756,12 @@ async function fetchRealMatches() {
       let result = null;
       if (status === 'FT' && m.score?.fullTime) {
         result = { home: m.score.fullTime.home ?? 0, away: m.score.fullTime.away ?? 0 };
+      } else if (status === 'LIVE') {
+        // Placar ao vivo: fullTime atualiza durante o jogo na API v4
+        const sc = m.score?.fullTime;
+        if (sc && sc.home != null && sc.away != null) {
+          result = { home: sc.home, away: sc.away };
+        }
       }
 
       const groupRaw = m.group || m.stage || 'Fase de Grupos';
@@ -1351,17 +1357,23 @@ function renderNextMatch() {
   if (!nextMatchRef) { el.innerHTML = '<div style="text-align:center;color:var(--gray);font-size:14px;">Sem jogos agendados.</div>'; return; }
   const isLive = nextMatchRef.status === 'LIVE';
 
+  const liveScore = isLive && nextMatchRef.result != null
+    ? `<div style="font-size:32px;font-weight:800;color:#fff;letter-spacing:4px;margin:6px 0;">${nextMatchRef.result.home} <span style="color:var(--gold)">×</span> ${nextMatchRef.result.away}</div>`
+    : isLive
+    ? `<div style="font-size:13px;color:var(--gray);margin:6px 0;">Placar não disponível</div>`
+    : '';
+
   el.innerHTML = `
     <div class="nm-teams">
       <div class="nm-team"><span class="nm-flag">${nextMatchRef.home.flag}</span><span class="nm-name">${nextMatchRef.home.name}</span></div>
-      <span class="nm-vs">VS</span>
+      ${isLive ? liveScore : '<span class="nm-vs">VS</span>'}
       <div class="nm-team"><span class="nm-flag">${nextMatchRef.away.flag}</span><span class="nm-name">${nextMatchRef.away.name}</span></div>
     </div>
     <div class="nm-time">
-      ${isLive ? '<span class="live-badge">AO VIVO</span> · ' : ''}
+      ${isLive ? '<span class="live-badge">AO VIVO</span> · ' : '⚡ PRÓXIMO JOGO · '}
       ${nextMatchRef.group} · ${formatDate(nextMatchRef.date)} às ${nextMatchRef.time} (Brasília)
     </div>
-    ${!isLive ? `<div id="countdown-wrap">${getCountdownHTML(nextMatchRef.date, nextMatchRef.time)}</div>` : ''}`;
+    ${isLive ? '<div style="font-size:11px;color:var(--gray);text-align:center;margin-top:4px;">⚡ Jogo em andamento!</div>' : `<div id="countdown-wrap">${getCountdownHTML(nextMatchRef.date, nextMatchRef.time)}</div>`}`;
 
   if (!isLive) {
     if (countdownInterval) clearInterval(countdownInterval);
