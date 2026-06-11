@@ -249,8 +249,8 @@ body {
 #api-status { display:none; font-size:11px; color:var(--gray); padding:8px 12px; background:rgba(0,0,0,.2); border-radius:6px; margin-bottom:16px; border-left:3px solid var(--gold); }
 
 /* ── RANKING ── */
-.rank-tabs { display:flex; gap:4px; background:rgba(0,0,0,.3); border-radius:8px; padding:4px; margin-bottom:14px; }
-.rank-tab { flex:1; text-align:center; padding:7px; border-radius:6px; font-size:12px; font-weight:600; cursor:pointer; transition:all .2s; color:var(--gray); border:none; background:transparent; }
+.rank-tabs { display:flex; gap:3px; background:rgba(0,0,0,.3); border-radius:8px; padding:3px; margin-bottom:14px; }
+.rank-tab { flex:1; text-align:center; padding:6px 2px; border-radius:6px; font-size:11px; font-weight:600; cursor:pointer; transition:all .2s; color:var(--gray); border:none; background:transparent; white-space:nowrap; }
 .rank-tab.active { background:var(--green); color:var(--cream); }
 .match-select {
   width:100%; padding:9px 12px; background:rgba(0,0,0,.3);
@@ -491,7 +491,9 @@ body {
     <h2 class="sec-title">RANKING</h2>
     <div class="rank-tabs">
       <button class="rank-tab active" onclick="switchRankingTab('geral',this)">🏆 Geral</button>
-      <button class="rank-tab" onclick="switchRankingTab('jogo',this)">⚽ Por Jogo</button>
+      <button class="rank-tab" onclick="switchRankingTab('jogo',this)">⚽ Jogo</button>
+      <button class="rank-tab" onclick="switchRankingTab('dia',this)">📅 Dia</button>
+      <button class="rank-tab" onclick="switchRankingTab('rodada',this)">🔄 Rodada</button>
     </div>
 
     <!-- Ranking Geral -->
@@ -508,6 +510,26 @@ body {
       </select>
       <div id="ranking-jogo-card" class="rank-card">
         <div class="empty-state" style="padding:20px">Selecione um jogo acima.</div>
+      </div>
+    </div>
+
+    <!-- Ranking Por Dia -->
+    <div id="rank-panel-dia" style="display:none">
+      <select class="match-select" id="day-select" onchange="renderRankingPorDia(this.value)">
+        <option value="">Selecione um dia…</option>
+      </select>
+      <div id="ranking-dia-card" class="rank-card">
+        <div class="empty-state" style="padding:20px">Selecione um dia acima.</div>
+      </div>
+    </div>
+
+    <!-- Ranking Por Rodada -->
+    <div id="rank-panel-rodada" style="display:none">
+      <select class="match-select" id="round-select" onchange="renderRankingPorRodada(this.value)">
+        <option value="">Selecione uma rodada…</option>
+      </select>
+      <div id="ranking-rodada-card" class="rank-card">
+        <div class="empty-state" style="padding:20px">Selecione uma rodada acima.</div>
       </div>
     </div>
   </aside>
@@ -576,19 +598,14 @@ let allUsers = [];
 // ─── FALLBACK: jogos representativos Copa 2026 ────────────────────────────
 // Usado quando a API não está configurada
 const WC_FALLBACK = [
-  // Fase de Grupos - alguns jogos representativos
-  { id:'wc1',  home:{name:'EUA',flag:'🇺🇸'},       away:{name:'México',flag:'🇲🇽'},       date:'2026-06-11',time:'20:00', group:'Grupo A', status:'FT', result:{home:2,away:1} },
-  { id:'wc2',  home:{name:'Canadá',flag:'🇨🇦'},     away:{name:'Uruguai',flag:'🇺🇾'},     date:'2026-06-12',time:'17:00', group:'Grupo A', status:'FT', result:{home:0,away:1} },
-  { id:'wc3',  home:{name:'Brasil',flag:'🇧🇷'},     away:{name:'Noruega',flag:'🇳🇴'},     date:'2026-06-13',time:'22:00', group:'Grupo B', status:'NS', result:null },
-  { id:'wc4',  home:{name:'Argentina',flag:'🇦🇷'},  away:{name:'Equador',flag:'🇪🇨'},     date:'2026-06-14',time:'18:00', group:'Grupo B', status:'NS', result:null },
-  { id:'wc5',  home:{name:'Alemanha',flag:'🇩🇪'},   away:{name:'Japão',flag:'🇯🇵'},       date:'2026-06-15',time:'18:00', group:'Grupo C', status:'NS', result:null },
-  { id:'wc6',  home:{name:'França',flag:'🇫🇷'},     away:{name:'Bélgica',flag:'🇧🇪'},     date:'2026-06-16',time:'20:00', group:'Grupo C', status:'NS', result:null },
-  { id:'wc7',  home:{name:'Espanha',flag:'🇪🇸'},    away:{name:'Portugal',flag:'🇵🇹'},    date:'2026-06-17',time:'22:00', group:'Grupo D', status:'NS', result:null },
-  { id:'wc8',  home:{name:'Inglaterra',flag:'🏴󠁧󠁢󠁥󠁮󠁧󠁿'},  away:{name:'Holanda',flag:'🇳🇱'},  date:'2026-06-18',time:'18:00', group:'Grupo D', status:'NS', result:null },
-  { id:'wc9',  home:{name:'Itália',flag:'🇮🇹'},     away:{name:'Croácia',flag:'🇭🇷'},     date:'2026-06-19',time:'18:00', group:'Grupo E', status:'NS', result:null },
-  { id:'wc10', home:{name:'Marrocos',flag:'🇲🇦'},   away:{name:'Senegal',flag:'🇸🇳'},     date:'2026-06-20',time:'20:00', group:'Grupo E', status:'NS', result:null },
-  { id:'wc11', home:{name:'Coreia do Sul',flag:'🇰🇷'}, away:{name:'Austrália',flag:'🇦🇺'}, date:'2026-06-21',time:'18:00', group:'Grupo F', status:'NS', result:null },
-  { id:'wc12', home:{name:'Nigéria',flag:'🇳🇬'},    away:{name:'Gana',flag:'🇬🇭'},        date:'2026-06-22',time:'20:00', group:'Grupo F', status:'NS', result:null },
+  { id:'wc1',  home:{name:'EUA',flag:'🇺🇸'},       away:{name:'México',flag:'🇲🇽'},       date:'2026-06-11',time:'20:00', group:'Grupo A', roundKey:'Rodada 1', status:'FT', result:{home:2,away:1} },
+  { id:'wc2',  home:{name:'Canadá',flag:'🇨🇦'},     away:{name:'Uruguai',flag:'🇺🇾'},     date:'2026-06-12',time:'17:00', group:'Grupo A', roundKey:'Rodada 1', status:'FT', result:{home:0,away:1} },
+  { id:'wc3',  home:{name:'Brasil',flag:'🇧🇷'},     away:{name:'Noruega',flag:'🇳🇴'},     date:'2026-06-13',time:'22:00', group:'Grupo B', roundKey:'Rodada 1', status:'NS', result:null },
+  { id:'wc4',  home:{name:'Argentina',flag:'🇦🇷'},  away:{name:'Equador',flag:'🇪🇨'},     date:'2026-06-14',time:'18:00', group:'Grupo B', roundKey:'Rodada 1', status:'NS', result:null },
+  { id:'wc5',  home:{name:'Alemanha',flag:'🇩🇪'},   away:{name:'Japão',flag:'🇯🇵'},       date:'2026-06-15',time:'18:00', group:'Grupo C', roundKey:'Rodada 1', status:'NS', result:null },
+  { id:'wc6',  home:{name:'França',flag:'🇫🇷'},     away:{name:'Bélgica',flag:'🇧🇪'},     date:'2026-06-16',time:'20:00', group:'Grupo C', roundKey:'Rodada 1', status:'NS', result:null },
+  { id:'wc7',  home:{name:'Espanha',flag:'🇪🇸'},    away:{name:'Portugal',flag:'🇵🇹'},    date:'2026-06-17',time:'22:00', group:'Grupo D', roundKey:'Rodada 1', status:'NS', result:null },
+  { id:'wc8',  home:{name:'Inglaterra',flag:'🏴󠁧󠁢󠁥󠁮󠁧󠁿'},  away:{name:'Holanda',flag:'🇳🇱'},  date:'2026-06-18',time:'18:00', group:'Grupo D', roundKey:'Rodada 1', status:'NS', result:null },
 ];
 
 // ─── FLAG EMOJI (TLA 3 letras → emoji, usado pela football-data.org) ─────
@@ -712,6 +729,11 @@ async function fetchRealMatches() {
         .replace('THIRD_PLACE', '3º Lugar')
         .replace('GROUP_STAGE', 'Fase de Grupos');
 
+      const stageRaw = m.stage || 'GROUP_STAGE';
+      const roundKey = stageRaw === 'GROUP_STAGE'
+        ? 'Rodada ' + (m.matchday || 1)
+        : group; // usa nome da fase para mata-mata
+
       return {
         id: 'wc' + m.id,
         home: { name: homeName, flag: getFlag(homeCode) },
@@ -719,6 +741,7 @@ async function fetchRealMatches() {
         date: dateStr,
         time: timeStr,
         group,
+        roundKey,
         status,
         result,
       };
@@ -947,20 +970,95 @@ function countPicks(u) { return u.picks ? Object.keys(u.picks).length : 0; }
 function switchRankingTab(tab, btn) {
   document.querySelectorAll('.rank-tab').forEach(t => t.classList.remove('active'));
   btn.classList.add('active');
-  document.getElementById('rank-panel-geral').style.display = tab === 'geral' ? '' : 'none';
-  document.getElementById('rank-panel-jogo').style.display  = tab === 'jogo'  ? '' : 'none';
-  if (tab === 'jogo') populateMatchSelect();
+  ['geral','jogo','dia','rodada'].forEach(p =>
+    document.getElementById('rank-panel-' + p).style.display = p === tab ? '' : 'none'
+  );
+  if (tab === 'jogo')   populateMatchSelect();
+  if (tab === 'dia')    populateDaySelect();
+  if (tab === 'rodada') populateRoundSelect();
 }
 
 function populateMatchSelect() {
-  const sel = document.getElementById('match-select');
   const finished = allMatches.filter(m => m.status === 'FT' && m.result);
-  sel.innerHTML = '<option value="">Selecione um jogo…</option>' +
+  document.getElementById('match-select').innerHTML =
+    '<option value="">Selecione um jogo…</option>' +
     finished.map(m => `<option value="${m.id}">${m.home.flag} ${m.home.name} × ${m.away.flag} ${m.away.name} · ${m.group}</option>`).join('');
-  if (!finished.length) {
-    document.getElementById('ranking-jogo-card').innerHTML =
-      '<div class="empty-state" style="padding:20px">Nenhum jogo finalizado ainda.</div>';
-  }
+  if (!finished.length)
+    document.getElementById('ranking-jogo-card').innerHTML = '<div class="empty-state" style="padding:20px">Nenhum jogo finalizado ainda.</div>';
+}
+
+function populateDaySelect() {
+  const finished = allMatches.filter(m => m.status === 'FT' && m.result);
+  const days = [...new Set(finished.map(m => m.date))].sort();
+  document.getElementById('day-select').innerHTML =
+    '<option value="">Selecione um dia…</option>' +
+    days.map(d => {
+      const count = finished.filter(m => m.date === d).length;
+      return `<option value="${d}">${formatDateFull(d)} · ${count} jogo${count > 1 ? 's' : ''}</option>`;
+    }).join('');
+  if (!days.length)
+    document.getElementById('ranking-dia-card').innerHTML = '<div class="empty-state" style="padding:20px">Nenhum jogo finalizado ainda.</div>';
+}
+
+function populateRoundSelect() {
+  const finished = allMatches.filter(m => m.status === 'FT' && m.result);
+  const rounds = [...new Set(finished.map(m => m.roundKey || 'Rodada 1'))].sort((a, b) => {
+    const numA = parseInt(a.replace(/\D/g, '')) || 99;
+    const numB = parseInt(b.replace(/\D/g, '')) || 99;
+    return numA - numB;
+  });
+  document.getElementById('round-select').innerHTML =
+    '<option value="">Selecione uma rodada…</option>' +
+    rounds.map(r => {
+      const count = finished.filter(m => (m.roundKey || 'Rodada 1') === r).length;
+      return `<option value="${r}">${r} · ${count} jogo${count > 1 ? 's' : ''}</option>`;
+    }).join('');
+  if (!rounds.length)
+    document.getElementById('ranking-rodada-card').innerHTML = '<div class="empty-state" style="padding:20px">Nenhum jogo finalizado ainda.</div>';
+}
+
+// ─── RANKING ACUMULADO (helper) ───────────────────────────────────────────
+function renderRankingAcumulado(matches, cardId) {
+  const card = document.getElementById(cardId);
+  if (!matches.length) { card.innerHTML = '<div class="empty-state" style="padding:20px">Nenhum jogo finalizado nesse período.</div>'; return; }
+  if (!allUsers.length) { card.innerHTML = '<div class="empty-state" style="padding:20px">Nenhum participante ainda.</div>'; return; }
+
+  const posClass = i => i===0?'gold':i===1?'silver':i===2?'bronze':'';
+  const posIcon  = i => i===0?'🥇':i===1?'🥈':i===2?'🥉':i+1;
+
+  const ranked = allUsers.map(u => {
+    let pts = 0;
+    matches.forEach(m => { pts += calcMatchPts(u.picks?.[m.id], m.result).pts; });
+    const pickCount = matches.filter(m => u.picks?.[m.id]).length;
+    return { ...u, periodPts: pts, pickCount };
+  }).sort((a, b) => b.periodPts - a.periodPts);
+
+  card.innerHTML = ranked.map((u, i) => `
+    <div class="rank-item">
+      <div class="rank-pos ${posClass(i)}">${posIcon(i)}</div>
+      ${iniAvatar(u.name)}
+      <div class="rank-info">
+        <div class="rank-name">${u.name || 'Usuário'}</div>
+        <div class="rank-sub">${u.pickCount}/${matches.length} palpites</div>
+      </div>
+      <div class="rank-pts">
+        <div class="rank-pts-num">${u.periodPts}</div>
+        <div class="rank-pts-label">pts</div>
+      </div>
+    </div>
+  `).join('');
+}
+
+function renderRankingPorDia(date) {
+  if (!date) return;
+  const matches = allMatches.filter(m => m.date === date && m.status === 'FT' && m.result);
+  renderRankingAcumulado(matches, 'ranking-dia-card');
+}
+
+function renderRankingPorRodada(roundKey) {
+  if (!roundKey) return;
+  const matches = allMatches.filter(m => (m.roundKey || 'Rodada 1') === roundKey && m.status === 'FT' && m.result);
+  renderRankingAcumulado(matches, 'ranking-rodada-card');
 }
 
 function calcMatchPts(pick, result) {
@@ -1161,6 +1259,14 @@ function formatDate(d) {
   const [y,m,day] = d.split('-');
   const months = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
   return `${day} ${months[parseInt(m)-1]}`;
+}
+function formatDateFull(d) {
+  if (!d) return '';
+  const [y,m,day] = d.split('-');
+  const months = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+  const days = ['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'];
+  const dt = new Date(d + 'T12:00:00');
+  return `${days[dt.getDay()]}, ${parseInt(day)} de ${months[parseInt(m)-1]}`;
 }
 function showError(id, msg) {
   const el = document.getElementById(id);
