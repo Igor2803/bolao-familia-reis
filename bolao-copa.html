@@ -707,7 +707,7 @@ function getFlag(areaCode) {
 }
 
 // ─── BUSCAR JOGOS REAIS DA COPA 2026 ─────────────────────────────────────
-async function fetchRealMatches() {
+async function fetchRealMatches(bustCache = false) {
   const statusEl = document.getElementById('api-status');
 
   if (!FOOTBALL_API_KEY || FOOTBALL_API_KEY === 'SUA_CHAVE_FOOTBALL_DATA') {
@@ -716,11 +716,9 @@ async function fetchRealMatches() {
     return WC_FALLBACK;
   }
 
-  // Se Worker configurado, usa ele (funciona de qualquer origem, inclusive GitHub Pages e file://)
-  // Senão, tenta direto (só funciona em http://localhost:80)
-  const fetchUrl = WORKER_PROXY_URL
-    ? WORKER_PROXY_URL
-    : `${FOOTBALL_API_BASE}/competitions/WC/matches`;
+  // Adiciona ?t= para forçar bypass do cache do Cloudflare quando necessário
+  const base = WORKER_PROXY_URL || `${FOOTBALL_API_BASE}/competitions/WC/matches`;
+  const fetchUrl = bustCache ? `${base}?t=${Date.now()}` : base;
 
   const fetchHeaders = WORKER_PROXY_URL
     ? {}  // Worker já inclui o token internamente
@@ -753,6 +751,11 @@ async function fetchRealMatches() {
       if (m.status === 'FINISHED') status = 'FT';
       else if (m.status === 'IN_PLAY' || m.status === 'PAUSED') status = 'LIVE';
 
+      // Se API ainda diz NS mas horário já passou → trata como LIVE (cache desatualizado)
+      if (status === 'NS' && Date.now() > new Date(m.utcDate).getTime()) {
+        status = 'LIVE';
+      }
+
       let result = null;
       if (status === 'FT' && m.score?.fullTime) {
         result = { home: m.score.fullTime.home ?? 0, away: m.score.fullTime.away ?? 0 };
@@ -762,7 +765,6 @@ async function fetchRealMatches() {
         if (sc && sc.home != null && sc.away != null) {
           result = { home: sc.home, away: sc.away };
         } else {
-          // Jogo ao vivo mas placar ainda não disponível = 0×0
           result = { home: 0, away: 0 };
         }
       }
@@ -1202,7 +1204,7 @@ function startLivePolling() {
     const liveEl = document.getElementById('live-indicator');
     if (hasLive) {
       if (liveEl) liveEl.style.display = 'flex';
-      const updated = await fetchRealMatches();
+      const updated = await fetchRealMatches(true);
       if (updated) {
         allMatches = updated;
         renderMatches();
