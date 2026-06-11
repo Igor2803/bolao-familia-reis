@@ -1229,6 +1229,10 @@ function renderMatchCard(m, isToday = false) {
   const isLive = m.status === 'LIVE';
   const pickInfo = pick && isFinished ? getPalpiteResult(pick, m.result) : null;
 
+  // Bloqueia palpite se o jogo já começou (horário passado) ou está ao vivo/encerrado
+  const matchDateTime = new Date(m.date + 'T' + m.time + ':00-03:00');
+  const locked = isFinished || isLive || Date.now() >= matchDateTime.getTime();
+
   const scoreSection = isFinished
     ? `<div class="match-result">
         <div class="result-score">${m.result.home} <span>×</span> ${m.result.away}</div>
@@ -1237,7 +1241,12 @@ function renderMatchCard(m, isToday = false) {
     : isLive
     ? `<div class="match-result">
         <span class="live-badge">AO VIVO</span>
-        ${pick ? `<div class="palpite-info" style="color:var(--gold);margin-top:6px;">Seu palpite: ${pick.home}×${pick.away}</div>` : ''}
+        ${pick ? `<div class="palpite-info" style="color:var(--gold);margin-top:6px;">Seu palpite: ${pick.home}×${pick.away}</div>` : '<div class="palpite-info" style="color:var(--gray);margin-top:6px;">Sem palpite</div>'}
+       </div>`
+    : locked
+    ? `<div class="match-result">
+        <div style="font-size:11px;color:var(--gray);text-align:center;">🔒 Jogo iniciado — palpites encerrados</div>
+        ${pick ? `<div class="palpite-info" style="color:var(--gold);margin-top:6px;">Seu palpite: ${pick.home}×${pick.away}</div>` : '<div class="palpite-info" style="color:var(--gray);margin-top:4px;">Sem palpite</div>'}
        </div>`
     : `<div>
         <div class="score-inputs">
@@ -1273,6 +1282,13 @@ function renderMatchCard(m, isToday = false) {
 }
 
 function handleSave(matchId) {
+  const match = allMatches.find(m => m.id === matchId);
+  if (match) {
+    const matchDateTime = new Date(match.date + 'T' + match.time + ':00-03:00');
+    if (match.status === 'FT' || match.status === 'LIVE' || Date.now() >= matchDateTime.getTime()) {
+      toast('🔒 Palpites encerrados — jogo já iniciado!'); return;
+    }
+  }
   const h = document.getElementById('h-' + matchId).value;
   const a = document.getElementById('a-' + matchId).value;
   if (h === '' || a === '') { toast('Preencha o placar dos dois times!'); return; }
