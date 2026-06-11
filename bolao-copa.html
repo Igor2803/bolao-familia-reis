@@ -248,6 +248,23 @@ body {
 /* ── API STATUS ── */
 #api-status { display:none; font-size:11px; color:var(--gray); padding:8px 12px; background:rgba(0,0,0,.2); border-radius:6px; margin-bottom:16px; border-left:3px solid var(--gold); }
 
+/* ── FILTROS DE JOGOS ── */
+.match-filters { display:flex; gap:6px; flex-wrap:wrap; align-items:center; margin-bottom:16px; }
+.mf-btn { padding:6px 14px; border-radius:20px; font-size:12px; font-weight:600; cursor:pointer; border:1.5px solid rgba(255,255,255,.15); background:transparent; color:var(--gray); transition:all .2s; white-space:nowrap; }
+.mf-btn:hover { border-color:var(--gold); color:var(--gold); }
+.mf-btn.active { background:var(--gold); color:var(--slate); border-color:var(--gold); }
+.mf-select-sm { padding:6px 10px; border-radius:20px; font-size:12px; background:rgba(0,0,0,.3); border:1.5px solid rgba(255,255,255,.15); color:var(--gray); cursor:pointer; }
+.mf-select-sm:focus { outline:none; border-color:var(--gold); }
+.mf-select-sm option { background:#1e3328; }
+
+/* ── DESTAQUE HOJE ── */
+.match-card.today { border-color: rgba(201,162,39,.5); background: rgba(201,162,39,.07); }
+.today-badge { display:inline-block; background:var(--gold); color:var(--slate); font-size:9px; font-weight:700; padding:2px 7px; border-radius:3px; letter-spacing:1px; margin-left:6px; vertical-align:middle; }
+
+/* ── LIVE UPDATE INDICATOR ── */
+#live-indicator { display:none; align-items:center; gap:6px; font-size:11px; color:var(--red); font-weight:600; margin-bottom:10px; }
+#live-indicator .dot { width:8px; height:8px; border-radius:50%; background:var(--red); animation:pulse 1.2s infinite; flex-shrink:0; }
+
 /* ── RANKING ── */
 .rank-tabs { display:flex; gap:3px; background:rgba(0,0,0,.3); border-radius:8px; padding:3px; margin-bottom:14px; }
 .rank-tab { flex:1; text-align:center; padding:6px 2px; border-radius:6px; font-size:11px; font-weight:600; cursor:pointer; transition:all .2s; color:var(--gray); border:none; background:transparent; white-space:nowrap; }
@@ -478,6 +495,22 @@ body {
         <div class="legend-item"><div class="dot" style="background:var(--gold)"></div><span style="color:var(--gold)">Vencedor Correto — 5 pts</span></div>
         <div class="legend-item"><div class="dot" style="background:var(--gray)"></div><span style="color:var(--gray)">Errou — 0 pts</span></div>
       </div>
+
+      <!-- Filtros -->
+      <div class="match-filters" id="match-filters">
+        <button class="mf-btn active" onclick="setMatchFilter('hoje',this)">📅 Hoje</button>
+        <button class="mf-btn" onclick="setMatchFilter('amanha',this)">Amanhã</button>
+        <button class="mf-btn" onclick="setMatchFilter('todos',this)">Todos</button>
+        <select class="mf-select-sm" id="group-filter" onchange="setMatchFilter('grupo:'+this.value, null)">
+          <option value="">Fase/Grupo</option>
+        </select>
+      </div>
+
+      <!-- Indicador ao vivo -->
+      <div id="live-indicator">
+        <span class="dot"></span> Jogo ao vivo — atualizando automaticamente
+      </div>
+
       <div id="api-status"></div>
       <div id="matches-list"><div class="empty-state"><div class="spinner"></div>Buscando jogos da Copa…</div></div>
     </div>
@@ -594,6 +627,8 @@ let currentUser = null;
 let allMatches = [];
 let userPicks = {};
 let allUsers = [];
+let currentFilter = 'hoje';
+let livePollingInterval = null;
 
 // ─── FALLBACK: jogos representativos Copa 2026 ────────────────────────────
 // Usado quando a API não está configurada
@@ -775,8 +810,10 @@ waitForFB(() => {
 // Buscar jogos independentemente do Firebase
 fetchRealMatches().then(matches => {
   allMatches = matches;
+  populateGroupFilter();
   renderMatches();
   renderNextMatch();
+  startLivePolling();
 });
 
 // ─── AUTH UI ──────────────────────────────────────────────────────────────
@@ -1105,14 +1142,85 @@ function renderRankingPorJogo(matchId) {
   `).join('');
 }
 
+// ─── DATA DE HOJE EM BRASÍLIA ─────────────────────────────────────────────
+function getBrDate(offsetDays = 0) {
+  const d = new Date(Date.now() - 3 * 60 * 60 * 1000 + offsetDays * 86400000);
+  return d.toISOString().split('T')[0];
+}
+
+// ─── FILTRO DE JOGOS ──────────────────────────────────────────────────────
+function setMatchFilter(filter, btn) {
+  currentFilter = filter;
+  if (btn) {
+    document.querySelectorAll('.mf-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+  }
+  if (!filter.startsWith('grupo:')) {
+    document.getElementById('group-filter').value = '';
+  }
+  renderMatches();
+}
+
+function getFilteredMatches() {
+  const hoje = getBrDate(0);
+  const amanha = getBrDate(1);
+  if (currentFilter === 'hoje')   return allMatches.filter(m => m.date === hoje);
+  if (currentFilter === 'amanha') return allMatches.filter(m => m.date === amanha);
+  if (currentFilter.startsWith('grupo:')) {
+    const g = currentFilter.slice(6);
+    return g ? allMatches.filter(m => m.group === g) : allMatches;
+  }
+  return allMatches;
+}
+
+function populateGroupFilter() {
+  const groups = [...new Set(allMatches.map(m => m.group))];
+  const sel = document.getElementById('group-filter');
+  if (!sel) return;
+  sel.innerHTML = '<option value="">Fase/Grupo</option>' +
+    groups.map(g => `<option value="${g}">${g}</option>`).join('');
+}
+
+// ─── POLLING AO VIVO ──────────────────────────────────────────────────────
+function startLivePolling() {
+  if (livePollingInterval) clearInterval(livePollingInterval);
+  livePollingInterval = setInterval(async () => {
+    const hasLive = allMatches.some(m => m.status === 'LIVE');
+    const liveEl = document.getElementById('live-indicator');
+    if (hasLive) {
+      if (liveEl) liveEl.style.display = 'flex';
+      const updated = await fetchRealMatches();
+      if (updated) {
+        allMatches = updated;
+        renderMatches();
+        renderNextMatch();
+      }
+    } else {
+      if (liveEl) liveEl.style.display = 'none';
+    }
+  }, 60000); // verifica a cada 60s
+}
+
 // ─── RENDER MATCHES ───────────────────────────────────────────────────────
 function renderMatches() {
   const list = document.getElementById('matches-list');
-  if (!allMatches.length) { list.innerHTML = '<div class="empty-state">Nenhum jogo disponível.</div>'; return; }
-  list.innerHTML = allMatches.map(m => renderMatchCard(m)).join('');
+  const filtered = getFilteredMatches();
+  const hoje = getBrDate(0);
+  const liveEl = document.getElementById('live-indicator');
+
+  // Mostra/esconde indicador ao vivo
+  const hasLive = filtered.some(m => m.status === 'LIVE');
+  if (liveEl) liveEl.style.display = hasLive ? 'flex' : 'none';
+
+  if (!filtered.length) {
+    const label = currentFilter === 'hoje' ? 'Nenhum jogo hoje.' : 'Nenhum jogo neste filtro.';
+    list.innerHTML = `<div class="empty-state">${label}</div>`;
+    return;
+  }
+  list.innerHTML = filtered.map(m => renderMatchCard(m, m.date === hoje)).join('');
 }
 
-function renderMatchCard(m) {
+function renderMatchCard(m, isToday = false) {
   const pick = userPicks[m.id];
   const isFinished = m.status === 'FT';
   const isLive = m.status === 'LIVE';
@@ -1142,9 +1250,9 @@ function renderMatchCard(m) {
        </div>`;
 
   return `
-  <div class="match-card">
+  <div class="match-card${isToday ? ' today' : ''}">
     <div class="match-meta">
-      <span class="match-group">${m.group}</span>
+      <span class="match-group">${m.group}${isToday ? '<span class="today-badge">HOJE</span>' : ''}</span>
       <span class="match-date">${formatDate(m.date)} às ${m.time} (Brasília)</span>
     </div>
     <div class="match-teams">
