@@ -757,10 +757,13 @@ async function fetchRealMatches() {
       if (status === 'FT' && m.score?.fullTime) {
         result = { home: m.score.fullTime.home ?? 0, away: m.score.fullTime.away ?? 0 };
       } else if (status === 'LIVE') {
-        // Placar ao vivo: fullTime atualiza durante o jogo na API v4
-        const sc = m.score?.fullTime;
+        // Tenta fullTime primeiro, depois halfTime como fallback
+        const sc = m.score?.fullTime ?? m.score?.halfTime;
         if (sc && sc.home != null && sc.away != null) {
           result = { home: sc.home, away: sc.away };
+        } else {
+          // Jogo ao vivo mas placar ainda não disponível = 0×0
+          result = { home: 0, away: 0 };
         }
       }
 
@@ -1248,7 +1251,8 @@ function renderMatchCard(m, isToday = false) {
     : isLive
     ? `<div class="match-result">
         <span class="live-badge">AO VIVO</span>
-        ${pick ? `<div class="palpite-info" style="color:var(--gold);margin-top:6px;">Seu palpite: ${pick.home}×${pick.away}</div>` : '<div class="palpite-info" style="color:var(--gray);margin-top:6px;">Sem palpite</div>'}
+        <div class="result-score" style="margin-top:6px;">${m.result != null ? `${m.result.home} <span>×</span> ${m.result.away}` : '- × -'}</div>
+        ${pick ? `<div class="palpite-info" style="color:var(--gold);margin-top:4px;">Seu palpite: ${pick.home}×${pick.away}</div>` : '<div class="palpite-info" style="color:var(--gray);margin-top:4px;">Sem palpite</div>'}
        </div>`
     : locked
     ? `<div class="match-result">
@@ -1357,10 +1361,8 @@ function renderNextMatch() {
   if (!nextMatchRef) { el.innerHTML = '<div style="text-align:center;color:var(--gray);font-size:14px;">Sem jogos agendados.</div>'; return; }
   const isLive = nextMatchRef.status === 'LIVE';
 
-  const liveScore = isLive && nextMatchRef.result != null
-    ? `<div style="font-size:32px;font-weight:800;color:#fff;letter-spacing:4px;margin:6px 0;">${nextMatchRef.result.home} <span style="color:var(--gold)">×</span> ${nextMatchRef.result.away}</div>`
-    : isLive
-    ? `<div style="font-size:13px;color:var(--gray);margin:6px 0;">Placar não disponível</div>`
+  const liveScore = isLive
+    ? `<div style="font-size:32px;font-weight:800;color:#fff;letter-spacing:4px;margin:6px 0;">${nextMatchRef.result != null ? `${nextMatchRef.result.home} <span style="color:var(--gold)">×</span> ${nextMatchRef.result.away}` : '- × -'}</div>`
     : '';
 
   el.innerHTML = `
