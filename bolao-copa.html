@@ -577,10 +577,12 @@ body {
     <div id="form-login">
       <h2>BEM-VINDO 👋</h2>
       <p>Entre com sua conta para dar seus palpites</p>
-      <div class="field"><label>Email</label><input type="email" id="l-email" placeholder="voce@email.com"></div>
-      <div class="field"><label>Senha</label><input type="password" id="l-pass" placeholder="••••••••"></div>
-      <div id="l-error" class="modal-error"></div>
-      <button class="btn btn-primary" style="width:100%;margin-top:8px;" onclick="doLogin()">Entrar</button>
+      <form onsubmit="doLogin();return false;" autocomplete="on">
+        <div class="field"><label>Email</label><input type="email" id="l-email" placeholder="voce@email.com" autocomplete="email"></div>
+        <div class="field"><label>Senha</label><input type="password" id="l-pass" placeholder="••••••••" autocomplete="current-password"></div>
+        <div id="l-error" class="modal-error"></div>
+        <button type="submit" class="btn btn-primary" style="width:100%;margin-top:8px;">Entrar</button>
+      </form>
       <p class="modal-switch">Não tem conta? <a onclick="switchForm('register')">Cadastre-se grátis</a></p>
     </div>
 
@@ -591,13 +593,15 @@ body {
       <div class="avatar-upload-wrap">
         <div id="avatar-initials-preview" style="width:80px;height:80px;border-radius:50%;background:var(--green);border:3px solid var(--border);display:flex;align-items:center;justify-content:center;font-family:'Bebas Neue';font-size:32px;color:var(--gold);">?</div>
       </div>
-      <div class="field-row">
-        <div class="field"><label>Nome</label><input type="text" id="r-name" placeholder="Seu nome" oninput="updateInitialsPreview(this.value)"></div>
-      </div>
-      <div class="field"><label>Email</label><input type="email" id="r-email" placeholder="voce@email.com"></div>
-      <div class="field"><label>Senha</label><input type="password" id="r-pass" placeholder="Mínimo 6 caracteres"></div>
-      <div id="r-error" class="modal-error"></div>
-      <button class="btn btn-primary" style="width:100%;margin-top:8px;" onclick="doRegister()">Criar conta</button>
+      <form onsubmit="doRegister();return false;" autocomplete="on">
+        <div class="field-row">
+          <div class="field"><label>Nome</label><input type="text" id="r-name" placeholder="Seu nome" autocomplete="name" oninput="updateInitialsPreview(this.value)"></div>
+        </div>
+        <div class="field"><label>Email</label><input type="email" id="r-email" placeholder="voce@email.com" autocomplete="email"></div>
+        <div class="field"><label>Senha</label><input type="password" id="r-pass" placeholder="Mínimo 6 caracteres" autocomplete="new-password"></div>
+        <div id="r-error" class="modal-error"></div>
+        <button type="submit" class="btn btn-primary" style="width:100%;margin-top:8px;">Criar conta</button>
+      </form>
       <p class="modal-switch">Já tem conta? <a onclick="switchForm('login')">Entrar</a></p>
     </div>
 
