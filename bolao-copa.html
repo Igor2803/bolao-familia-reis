@@ -1006,6 +1006,13 @@ function renderRankingFallback() {
 }
 
 function renderRanking(users) {
+  // Recalcula pontos na hora a partir dos palpites e resultados reais
+  users = users.map(u => {
+    let pts = 0;
+    allMatches.forEach(m => { pts += calcMatchPts(u.picks?.[m.id], m.result).pts; });
+    return { ...u, points: pts };
+  });
+  users.sort((a, b) => b.points - a.points);
   allUsers = users;
   if (!users.length) { renderRankingFallback(); return; }
   const posClass = i => i===0?'gold':i===1?'silver':i===2?'bronze':'';
