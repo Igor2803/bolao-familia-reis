@@ -779,8 +779,30 @@ async function fetchRealMatches(bustCache = false) {
       }
 
       let result = null;
-      if (status === 'FT' && m.score?.fullTime) {
-        result = { home: m.score.fullTime.home ?? 0, away: m.score.fullTime.away ?? 0 };
+      let penalties = null; // placar dos pênaltis (só para exibição)
+      const scoreDuration = m.score?.duration; // 'REGULAR', 'EXTRA_TIME', 'PENALTY_SHOOTOUT'
+
+      if (status === 'FT') {
+        if (scoreDuration === 'PENALTY_SHOOTOUT') {
+          // Bolão usa placar do tempo regulamentar/prorrogação, NUNCA dos pênaltis
+          const rt = m.score?.regularTime;
+          const et = m.score?.extraTime;
+          const ft = m.score?.fullTime;
+          // regularTime é o mais confiável; fullTime pode vir com o resultado dos pênaltis
+          if (rt?.home != null && rt?.away != null) {
+            result = { home: rt.home, away: rt.away };
+          } else if (ft?.home != null && ft?.away != null && ft.home !== m.score?.penalties?.home) {
+            result = { home: ft.home, away: ft.away };
+          } else {
+            // fallback: extraTime acumulado ou halfTime
+            result = { home: 0, away: 0 };
+          }
+          // Guarda o placar dos pênaltis para mostrar na tela
+          const pen = m.score?.penalties;
+          if (pen?.home != null) penalties = { home: pen.home, away: pen.away };
+        } else if (m.score?.fullTime) {
+          result = { home: m.score.fullTime.home ?? 0, away: m.score.fullTime.away ?? 0 };
+        }
       } else if (status === 'LIVE') {
         // Tenta fullTime primeiro, depois halfTime como fallback
         const sc = m.score?.fullTime ?? m.score?.halfTime;
@@ -816,6 +838,7 @@ async function fetchRealMatches(bustCache = false) {
         roundKey,
         status,
         result,
+        penalties,
       };
     });
   } catch (err) {
@@ -1299,9 +1322,14 @@ function renderMatchCard(m, isToday = false) {
       })()
     : '';
 
+  const penLine = isFinished && m.penalties
+    ? `<div style="font-size:10px;color:var(--gray);margin-top:2px;">Pênaltis: ${m.penalties.home}–${m.penalties.away}</div>`
+    : '';
+
   const scoreSection = isFinished
     ? `<div class="match-result">
         <div class="result-score">${m.result.home} <span>×</span> ${m.result.away}</div>
+        ${penLine}
         ${pick ? `<div class="palpite-info ${pickInfo.cls}">Seu palpite: ${pick.home}×${pick.away} — ${pickInfo.label}</div>` : '<div class="palpite-info" style="color:var(--gray)">Sem palpite</div>'}
        </div>`
     : isLive
